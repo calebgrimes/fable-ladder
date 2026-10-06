@@ -1,5 +1,13 @@
 {
   "name": "fable-ladder",
-  "owner": { "name": "Caleb Grimes" },
-  "plugins": [{ "name": "ladder", "source": "./" }]
+  "owner": {
+    "name": "Caleb Grimes"
+  },
+  "plugins": [
+    {
+      "name": "ladder",
+      "source": "./"
+    }
+  ],
+  "description": "The ladder plugin: Fable on top, Haiku triage of every prompt, the session moved down a rung when the top would be wasted and back up for judgment; ships /orchestrate."
 }
