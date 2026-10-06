@@ -70,6 +70,15 @@ Nothing, for the ladder: type as usual. For a build:
 /orchestrate resume
 ```
 
+Each worker's tier is a forecast, then corrected by evidence. Before dispatch the conductor scores the
+node on five questions (how much is left to judgment, reasoning depth, blast radius, context, novelty)
+and starts at the cheapest tier the score allows. Every report ends with the worker's own `Tier:` and
+`Confidence:` lines. A worker that stalled on understanding, failed its check or claimed work it did
+not show is re-dispatched one rung up with its report attached, at most twice, never to Fable. A worker
+that passed easily marks that kind of work as cheaper, and the next one starts a rung lower.
+`.orchestrate/tier-log.md` keeps the outcomes, so the next build in the same project starts smarter.
+The always-on ladder policy carries a one-line version of the same rule into every session.
+
 Planner overrides: `ORCH_MODEL` (default `claude-opus-5-5`, falls back to `opus`), `ORCH_EFFORT`
 (default `medium`).
 

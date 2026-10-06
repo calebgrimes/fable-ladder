@@ -13,7 +13,7 @@ bad() { printf 'FAIL  %s\n' "$1"; fail=1; }
 # Layout
 for f in .claude-plugin/plugin.json .claude-plugin/marketplace.json hooks/hooks.json types/index.d.ts \
          skills/orchestrate/SKILL.md skills/orchestrate/scripts/ask_opus.sh \
-         skills/orchestrate/templates/brief.md skills/orchestrate/templates/board.md tests/ladder.test.ts; do
+         skills/orchestrate/templates/brief.md skills/orchestrate/templates/board.md skills/orchestrate/templates/tier-log.md tests/ladder.test.ts; do
   [[ -f "$repo_root/$f" ]] && ok "present $f" || bad "missing $f"
 done
 [[ -f "$mod" ]] && ok "present hooks/ladder.mjs" || bad "missing hooks/ladder.mjs (the hooks module)"
@@ -44,14 +44,27 @@ done
 # Routing strings: Fable on top, Opus as planner, Sonnet default, Haiku bulk.
 head -1 "$skill/SKILL.md" | grep -qx -- '---' && grep -q '^name: orchestrate$' "$skill/SKILL.md" \
   && ok "frontmatter" || bad "frontmatter"
-for s in '| Conductor | Fable 5.1' 'claude-opus-5-5' 'Sonnet 5.5' 'Haiku 4.5' 'Opus 5.5 speaks:' 'Linear by default' 'Worker report format' 'Never route a worker to Fable'; do
+for s in '| Conductor | Fable 5.1' 'claude-opus-5-5' 'Sonnet 5.5' 'Haiku 4.5' 'Opus 5.5 speaks:' 'Linear by default' 'Worker report format' 'Never route a worker to Fable' 'Choosing and correcting the tier' 'Scaling up' 'Scaling down' 'one rung up' 'At most two escalations per node' 'Tier: right | too low' 'tier-log.md' 'a tier problem. Fix the brief'; do
   grep -q -- "$s" "$skill/SKILL.md" && ok "SKILL.md has '$s'" || bad "SKILL.md missing '$s'"
 done
+for s in 'Prior attempt:' 'score <0-10>' 'Tier line'; do
+  grep -q -- "$s" "$skill/templates/brief.md" && ok "brief has '$s'" || bad "brief missing '$s'"
+done
+grep -q -- '| Score | Tier |' "$skill/templates/board.md" && ok "board has score and tier" || bad "board missing score and tier"
+python3 - "$skill/SKILL.md" <<'EOF' && ok "rubric bands cover 0-10 with no gap" || bad "rubric bands"
+import re, sys
+s = open(sys.argv[1]).read()
+m = re.search(r"Total 0 to (\d+) goes to `haiku`, (\d+) to (\d+) to `sonnet`, (\d+) and up to `opus`", s)
+assert m, "band sentence"
+a, b, c, d = map(int, m.groups())
+assert b == a + 1 and d == c + 1 and d <= 10
+assert s.count("| 0 | 1 | 2 |") == 1 and len(re.findall(r"^\| (Spec:|Reasoning depth \||Blast radius|Context to hold|Novelty \|)", s, re.M)) == 5
+EOF
 for s in 'sonnet (Sonnet 5.5)' 'haiku (Haiku 4.5)' 'claude-opus-5-5'; do
   grep -q -- "$s" "$skill/scripts/ask_opus.sh" && ok "helper has '$s'" || bad "helper missing '$s'"
 done
 if [[ -f "$mod" ]]; then
-  for s in 'const TIERS = \["haiku", "sonnet", "opus", "fable"\]' 'prompt.submit' 'prompt.compose' 'asUser: true' 'command: "model"' 'ladder:policy' '.catch((\$, e, next) => next(e))' 'scheduleUpdateCheck(\$, e, cfg)'; do
+  for s in 'const TIERS = \["haiku", "sonnet", "opus", "fable"\]' 'prompt.submit' 'prompt.compose' 'asUser: true' 'command: "model"' 'ladder:policy' '.catch((\$, e, next) => next(e))' 'scheduleUpdateCheck(\$, e, cfg)' 're-dispatch one' 'next similar task one tier lower'; do
     grep -q -- "$s" "$mod" && ok "module has '$s'" || bad "module missing '$s'"
   done
 fi
@@ -67,7 +80,7 @@ fi
 # House style and hygiene, repo-wide.
 if grep -rIiqE 'gpt|deepseek|codex|opencode' "$skill" "$repo_root/hooks" "$repo_root/types"; then bad "foreign model names"; else ok "no foreign model names"; fi
 if grep -rIq $'\xe2\x80\x94' --exclude-dir=.git "$repo_root"; then bad "em dash found"; else ok "no em dashes"; fi
-if grep -rIqE 'sk-ant-|ghp_|AKIA[0-9A-Z]{16}|BEGIN [A-Z ]*PRIVATE KEY|/Users/[a-z]' --exclude-dir=.git --exclude=test_skill.sh "$repo_root"; then
+if grep -rIqE 'sk-ant-|ghp_|AKIA[0-9A-Z]{16}|BEGIN [A-Z ]*PRIVATE KEY|/Users/[a-z]' --exclude-dir=.git --exclude=.git --exclude=test_skill.sh "$repo_root"; then
   bad "credential or personal path found"; else ok "no credentials or personal paths"; fi
 
 rc=0; printf '' | "$skill/scripts/ask_opus.sh" >/dev/null 2>&1 || rc=$?; [[ $rc -eq 64 ]] && ok "empty packet refused" || bad "empty packet refused (rc=$rc)"

@@ -1,6 +1,6 @@
 {
   "name": "ladder",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "The model ladder: the top model is spent on judgment only. Every prompt is triaged and the session moves down a rung when the top would be wasted, back up when judgment is needed. Ships the /orchestrate conductor skill.",
   "author": {
     "name": "Caleb Grimes"
