@@ -1,58 +1,58 @@
-# Opus orchestrator
+# Fable ladder
 
-A Claude Code skill that runs a multi-step build as a conductor. Opus 5.5 drafts and judges the plan in a
-clean side call, Sonnet 5.5 does most of the building, and Haiku 4.5 takes the loops and bulk mechanical
-work. Workers run one at a time by default, and the conductor keeps its state in two small files, so the
-window you steer from stays short enough to run for days.
+A Claude Code plugin that keeps your best model for the work that needs it. Fable sits at the top of a
+ladder: Fable, Opus, Sonnet, Haiku. Every prompt you type is triaged by one cheap Haiku call, and when
+the session's current model is the wrong rung, the plugin moves the session with the same `/model` you
+would type and resubmits your prompt in your own words. Routine building drops to Sonnet; a judgment
+call climbs back to Fable; you are told each time, and the status line shows the rung.
 
-Adapted from [codejunkie99/fable-orchestrator](https://github.com/codejunkie99/fable-orchestrator), which
-plans with Claude Fable inside OpenAI Codex and builds with GPT and DeepSeek workers. This version keeps
-its best idea (planning in a separate, tool-less Claude call) and moves everything into Claude Code with
-Claude models only. It also folds in conductor habits learned from running long multi-stage builds:
+It also ships `/orchestrate`, a conductor skill for multi-stage builds: Opus drafts the plan in a clean
+side call, Sonnet builds, Haiku runs the bulk work, one worker at a time, with the board and handover
+kept in files so the conducting window stays small enough to run for days.
 
-- **Linear by default.** One worker, one report, then the next. Parallel only when asked, at most 4.
-- **State in files.** `.orchestrate/board.md` and `.orchestrate/handover.md` are the memory, so a fresh
-  session resumes with `/orchestrate resume` instead of re-reading history.
-- **Short briefs, fixed reports.** A ten-line brief per worker; a 300-word report back in a set order,
-  with anything only a human can do returned as one exact `! <command>`.
-- **Script the skeleton.** Steps that repeat on every node become a script once; agents spend their
-  tokens on the part that changes.
-- **One bounded ruling.** Conflicts between nodes get one Opus ruling of at most 150 words, then go to
-  the human.
+Adapted from [codejunkie99/fable-orchestrator](https://github.com/codejunkie99/fable-orchestrator),
+which plans with Claude Fable inside OpenAI Codex and builds with GPT and DeepSeek workers. This
+version keeps its best idea (planning in a separate, tool-less Claude call), moves everything into
+Claude Code with Claude models only, and adds the ladder itself, so the routing runs in every session
+rather than only when a skill is invoked.
 
-## Roles
+## What runs in every session
 
-| Role | Model | Owns |
-|---|---|---|
-| Planner and judge | Opus 5.5 (`claude-opus-5-5`) via `scripts/ask_opus.sh` | Task graph, routing, rulings, final verdict |
-| Implementer (default) | Sonnet 5.5 (`sonnet`) | Well-specified implementation, which is most of it |
-| Throughput worker | Haiku 4.5 (`haiku`) | Loops, renames, boilerplate, conversion, scoring, triage |
-| Specialist | Opus 5.5 (`opus`) | Genuinely tricky nodes and fresh-eyes review |
+| Piece | What it does |
+|---|---|
+| Triage on every prompt | A Haiku call labels the prompt `fable`, `opus`, `sonnet` or `haiku` (cheaper when unsure). Prompts under 40 characters, slash commands, attachments and mid-turn prompts pass through untouched. |
+| The switch | When the label's rung differs from the session's, the prompt is held, `/model <rung>` runs, and the prompt is resubmitted as your own words. Nothing is lost: any failure lets the prompt through on the current model, and a failed resubmission puts the text back in the box. |
+| Your own `/model` wins | A model you chose by hand is held for 3 prompts before triage resumes. `/ladder pin` holds it for the session; `/ladder auto` resumes; `/ladder off` stops triage; `/ladder` reports. |
+| The policy | A short section is added to every system prompt: delegate with an explicit `model`, lowest rung that will do the node well; a session on Fable or Opus conducts rather than builds. |
+| Status | `ladder: fable · auto` in the status line; a toast on every move. Words, not colour, carry the signal. |
 
-## Layout
+Defaults, all in `/config`: top rung `fable`, bottom rung `sonnet` (Haiku remains the bulk *worker*
+tier; set the floor to `haiku` to let the session itself drop that far), switching back up on, 3-prompt
+hold after a manual `/model`, at least 1 prompt between moves.
 
-```text
-skill/orchestrate/
-  SKILL.md
-  scripts/ask_opus.sh
-  templates/brief.md
-  templates/board.md
-install.sh
-tests/test_skill.sh
-```
+One cost to know: a move re-reads the whole context on the new model once (the prompt cache does not
+carry across models). Moving down costs Sonnet tokens, which is the point. Moving up costs the top model
+one context read; the toast says how much, and `upSwitch` turns that direction off.
 
 ## Install
 
-```bash
-./install.sh --dry-run
-./install.sh --copy
+In a terminal session of Claude Code:
+
+```text
+/plugin install ladder --marketplace calebgrimes/fable-ladder
 ```
 
-Installs to `~/.claude/skills/orchestrate` (or `--target DIR`). Safe to re-run. It never reads or writes
-credentials; the planner helper uses your existing Claude Code login. Open a new Claude Code session
-afterwards so the skill is picked up.
+Answer `y` to add the marketplace and take the user scope. The hooks run from then on and in every
+later session. From a clone, the folder itself is the marketplace, so edits apply with `/reload-plugins`:
+
+```bash
+claude plugin marketplace add /path/to/fable-ladder
+claude plugin install ladder@fable-ladder --scope user
+```
 
 ## Use
+
+Nothing, for the ladder: type as usual. For a build:
 
 ```text
 /orchestrate build the export feature
@@ -64,15 +64,24 @@ afterwards so the skill is picked up.
 Planner overrides: `ORCH_MODEL` (default `claude-opus-5-5`, falls back to `opus`), `ORCH_EFFORT`
 (default `medium`).
 
+## Layout
+
+```text
+.claude-plugin/plugin.json        the plugin and its /config rows
+.claude-plugin/marketplace.json   makes this repository installable
+hooks/hooks.json, hooks/ladder.mjs
+types/index.d.ts                  the state contract
+skills/orchestrate/               SKILL.md, scripts/ask_opus.sh, templates/
+tests/ladder.test.ts              run by `claude plugin test`
+tests/test_skill.sh               layout, routing strings, house style, then validate and test
+```
+
 ## Test
 
 ```bash
-tests/test_skill.sh
+tests/test_skill.sh          # everything, including the engine's validate and test
+tests/test_skill.sh --quick  # skips `claude plugin test`
 ```
-
-Checks shell syntax, frontmatter, routing strings, the absence of non-Claude model names, house style
-(no em dashes), credential-shaped strings, a dry run that writes nothing, an idempotent copy, and that an
-empty packet is refused. Needs no live Claude login.
 
 ## License
 

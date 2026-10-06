@@ -1,0 +1,5 @@
+{
+  "name": "fable-ladder",
+  "owner": { "name": "Caleb Grimes" },
+  "plugins": [{ "name": "ladder", "source": "./" }]
+}

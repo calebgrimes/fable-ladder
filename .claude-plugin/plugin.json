@@ -1,0 +1,17 @@
+{
+  "name": "ladder",
+  "version": "0.2.0",
+  "description": "The model ladder: the top model is spent on judgment only. Every prompt is triaged and the session moves down a rung when the top would be wasted, back up when judgment is needed. Ships the /orchestrate conductor skill.",
+  "author": { "name": "Caleb Grimes" },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "enabled": { "type": "boolean", "title": "Ladder on", "description": "Off, the ladder neither triages nor switches; the policy section and /orchestrate still load.", "default": true },
+    "ceiling": { "type": "string", "title": "Top rung", "description": "The highest tier the ladder may move the session to.", "default": "fable", "options": ["fable", "opus", "sonnet", "haiku"] },
+    "floor": { "type": "string", "title": "Bottom rung", "description": "The lowest tier the ladder may move the session to. Haiku stays the bulk worker tier for delegation whatever this says.", "default": "sonnet", "options": ["fable", "opus", "sonnet", "haiku"] },
+    "upSwitch": { "type": "boolean", "title": "Switch back up", "description": "On, a prompt that needs the top rung moves the session back up. Each move up re-reads the whole context on the dearer model once.", "default": true },
+    "holdTurns": { "type": "number", "title": "Hold after /model", "description": "Prompts to honour a model you chose by hand before the ladder resumes.", "default": 3 },
+    "minTurnsBetweenSwitches": { "type": "number", "title": "Prompts between switches", "description": "Fewest prompts between two ladder moves, so a conversation that alternates does not flap.", "default": 1 },
+    "minChars": { "type": "number", "title": "Shortest prompt to triage", "description": "Shorter prompts (yes, continue, ok) pass through untouched on the current model.", "default": 40 },
+    "classifier": { "type": "string", "title": "Triage model", "description": "The cheap model that labels each prompt; an alias or a full id.", "default": "haiku" }
+  }
+}
