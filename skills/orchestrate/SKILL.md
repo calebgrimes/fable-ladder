@@ -20,7 +20,8 @@ do. The ladder, top to bottom:
 Whatever model the session runs (Fable, Opus, Sonnet), it stays the conductor.
 Every Agent call sets `model` explicitly; omitting it silently inherits the
 session model. Never route a worker to Fable. When unsure between tiers, pick
-the cheaper one and escalate on failure.
+the cheaper one and escalate on failure; the section on choosing and
+correcting the tier says how.
 
 ## Invocation
 
@@ -33,9 +34,85 @@ Everything after `/orchestrate` is the objective, or a path to a plan file:
 - `/orchestrate resume`
 
 An explicit route wins only when it names `sonnet`, `haiku` or `opus`. Without
-one, classify each node: loops and bulk mechanical work go to `haiku`;
-implementation with clear acceptance criteria goes to `sonnet`; genuinely
-tricky work goes to `opus`; research and review take the cheapest tier that fits.
+one, each node gets a tier from the rubric in "Choosing and correcting the
+tier" below, and that tier can move after the worker reports.
+
+## Choosing and correcting the tier
+
+The first pick is a forecast; the report is the evidence. Pick low, read the
+evidence, move one rung at a time.
+
+### First pick: score the node
+
+Score each node on five questions, 0, 1 or 2 points each:
+
+| Question | 0 | 1 | 2 |
+|---|---|---|---|
+| Spec: how much is left to judgment? | exact steps or a pattern to copy | goal and acceptance lines, path open | goal only, or the acceptance lines themselves need deciding |
+| Reasoning depth | look up, move, rename, convert | ordinary logic across a few files | concurrency, subtle algorithm, root cause unknown, design trade-off |
+| Blast radius if wrong | caught by the node's own check | caught by a later node | silent, outward-facing, or expensive to unwind |
+| Context to hold | one file or one record | a module, a handful of files | the whole system, or long cross-file chains |
+| Novelty | done before in this project (see the tier log) | familiar kind, new place | nothing like it here yet |
+
+Total 0 to 2 goes to `haiku`, 3 to 6 to `sonnet`, 7 and up to `opus`. Two
+overrides: any single 2 on reasoning depth sets the floor at `sonnet`, and
+volume work (the same small step many times) goes to `haiku` whatever the
+total, with one `sonnet` node to write the pattern first if none exists. Write
+the score on the board row (`s4 sonnet`) so the choice can be audited. Then
+check the tier log (below): if this kind of node has escalated before in this
+project, start it at the tier where it last succeeded.
+
+### Reading the report: was the tier too low?
+
+Every report ends with a `Tier:` line where the worker rates its own fit. Do
+not take that alone. Treat the tier as **too low** when any of these show:
+
+- `BLOCKED` or `PARTIAL` for a reason about understanding (could not find the
+  cause, unsure which design, ran out of approaches), not about access.
+- The check failed, or the worker fixed one failure and caused another.
+- The report misses acceptance lines, names files or functions that do not
+  exist, or claims a pass with no command shown.
+- A test was edited or weakened to pass, or the worker touched files it did
+  not own.
+- `Tier: too low`, or `Confidence: low` on work with a blast radius of 2.
+
+A failure about access, a missing file, a denied command or a wrong brief is
+**not** a tier problem. Fix the brief or raise a Needs you row; do not
+escalate for it.
+
+### Scaling up
+
+1. Re-dispatch the same node **one rung up** (`haiku` to `sonnet`, `sonnet`
+   to `opus`). Never skip a rung unless the node scored 2 on reasoning depth
+   and blast radius both.
+2. The new brief carries a `Prior attempt:` line: the failed report's path or
+   its Built, Check and Left lines, and one sentence on why it fell short. The
+   stronger worker continues from the partial work; it does not start over.
+3. At most two escalations per node. When `opus` also falls short, the node
+   goes to Needs you with both reports summarised. Never escalate a worker to
+   Fable; a Fable review is the user's call, asked for first.
+4. One retry at the **same** tier is allowed only when the failure was clearly
+   a slip (typo, one missed acceptance line) and the report shows the worker
+   understood the job.
+
+### Scaling down
+
+Overpaying is a failure too, just a quieter one. Treat the tier as **higher
+than needed** when the check passed first time, the worker rated
+`Tier: could go lower`, and the report shows no real decisions made. Do not
+re-run that node. Instead mark the kind of work in the tier log, and start the
+next node of the same kind one rung lower. If that cheaper node then
+escalates, the kind goes back up and stays there for this objective.
+
+### The tier log
+
+`.orchestrate/tier-log.md` (template in `templates/tier-log.md`) is one line
+per finished node: kind of work, score, starting tier, final tier, and
+`ok`, `up` or `could go lower`. Read it at Orient; it is how the second build
+in a project starts smarter than the first. It survives handovers and new
+objectives in the same project. Keep it under 80 lines by folding old lines
+into a short "Settled" list at the top (for example, "test fixtures:
+haiku is enough").
 
 ## Four standing rules
 
@@ -59,7 +136,7 @@ tricky work goes to `opus`; research and review take the cheapest tier that fits
 
 1. **Orient.** Read the objective and local instructions (CLAUDE.md, rules,
    memory). If `.orchestrate/handover.md` exists in the project, read it first
-   and resume from it.
+   and resume from it. Read `.orchestrate/tier-log.md` if it exists.
 2. **Plan.** Build a compact packet: objective, acceptance criteria, workspace
    facts, protected files, constraints, the worker menu, dispatch mode. Pipe it
    to `scripts/ask_opus.sh`. Show the reply verbatim under `Opus 5.5 speaks:`.
@@ -68,12 +145,15 @@ tricky work goes to `opus`; research and review take the cheapest tier that fits
 3. **Open the board.** Write `.orchestrate/board.md` in the project (template
    in `templates/board.md`): one row per node with column (To do, Doing,
    Checking, Needs you, Done), model, agent id, note.
-4. **Dispatch.** Fill `templates/brief.md` for the next ready node: ten lines
-   or so, pointing at the plan and acceptance lines rather than restating
-   them. Launch it. Record the agent id on its board row.
-5. **Read the report** (format below). Update the board. Run proportionate
-   verification yourself only when it is one command; otherwise make the
-   check its own node.
+4. **Dispatch.** Score the node and pick its tier (see above). Fill
+   `templates/brief.md` for the next ready node: ten lines or so, pointing at
+   the plan and acceptance lines rather than restating them. Launch it.
+   Record the agent id and the score on its board row.
+5. **Read the report** (format below) and judge the tier: too low, right, or
+   higher than needed. Escalate or note it as above, update the board's tier
+   column (`haiku>sonnet` when it moved) and append a tier log line. Run
+   proportionate verification yourself only when it is one command;
+   otherwise make the check its own node.
 6. **Adjudicate when needed.** For a conflict between two nodes, or a
    judgment the graph did not settle, send a short results packet back
    through `ask_opus.sh`. One bounded round, ruling of at most 150 words. If
@@ -97,7 +177,12 @@ Check: <command run, pass/fail counts, failing lines named>
 Needs you: <one exact `! <command>` per step only the user can run, what it changes; or "nothing">
 Cost: <tokens, tool uses, minutes>
 Left: <what is undone and what the next node must know>
+Confidence: high | medium | low, and the one thing most likely to be wrong
+Tier: right | too low (what was beyond reach) | could go lower (what made it easy)
 ```
+
+The `Tier:` line is the worker's honest read of its own fit. A worker that
+says `too low` is doing its job, not failing it; say so in every brief.
 
 ## Calling the planner
 

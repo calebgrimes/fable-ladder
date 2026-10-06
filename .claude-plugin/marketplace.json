@@ -9,5 +9,5 @@
       "source": "./"
     }
   ],
-  "description": "The ladder plugin: Fable on top, Haiku triage of every prompt, the session moved down a rung when the top would be wasted and back up for judgment; ships /orchestrate."
+  "description": "The ladder plugin: the /orchestrate conductor skill, an always-on delegation policy, and a self-updater. It never switches the session model."
 }
