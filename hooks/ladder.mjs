@@ -24,6 +24,8 @@ const DEFAULTS = {
   minTurnsBetweenSwitches: 1,
   minChars: 40,
   classifier: "haiku",
+  updates: "notify",
+  updateEveryDays: 21,
 };
 
 const CLASSIFIER_TIMEOUT_MS = 3000;
@@ -68,8 +70,8 @@ export function register(on, options = {}) {
     await safe(() =>
       $.command.register({
         name: "ladder",
-        description: "Show the model ladder, or set it: auto, pin, off.",
-        argumentHint: "[auto|pin|off]",
+        description: "Show the model ladder, or set it: auto, pin, off, update.",
+        argumentHint: "[auto|pin|off|update]",
       }),
     );
     const st = await load($);
@@ -77,6 +79,7 @@ export function register(on, options = {}) {
     st.setTier = tierOf(await safe(() => $.session.model()));
     await save($, st);
     showStatus($, st, st.setTier);
+    scheduleUpdateCheck($, e, cfg);
     return result;
   });
 
@@ -100,6 +103,16 @@ export function register(on, options = {}) {
     const st = await load($);
     const current = tierOf(await safe(() => $.session.model())) ?? "unknown";
     const arg = String(e.args ?? "").trim().toLowerCase();
+    if (arg === "update") {
+      const outcome = await checkForUpdate($, cfg, { force: true });
+      const said = {
+        current: "Already current.",
+        available: "An update is available.",
+        applied: "Updated. /reload-plugins to run it.",
+        failed: "The update failed; see the notice.",
+      }[outcome] ?? "Could not check; see the notice.";
+      return { text: `${said}\n${await updateSummary($, cfg)}` };
+    }
     if (arg === "auto" || arg === "pin" || arg === "off") {
       st.mode = arg;
       if (arg === "auto") st.pinUntilTurn = 0;
@@ -109,7 +122,7 @@ export function register(on, options = {}) {
       const tail = arg === "auto" ? "; the next prompt is triaged" : "";
       return { text: `Ladder ${arg}. The session stays on ${current}${tail}.` };
     }
-    return { text: report(st, current, cfg) };
+    return { text: `${report(st, current, cfg)}\n${await updateSummary($, cfg)}` };
   });
 
   // The gating hook. It judges before it calls next, and its catch lets the
@@ -230,6 +243,9 @@ function settings(options) {
   if (!TIERS.includes(out.ceiling)) out.ceiling = DEFAULTS.ceiling;
   if (!TIERS.includes(out.floor)) out.floor = DEFAULTS.floor;
   if (rank(out.floor) > rank(out.ceiling)) out.floor = out.ceiling;
+  if (!["apply", "notify", "off"].includes(out.updates)) out.updates = DEFAULTS.updates;
+  const days = Number(out.updateEveryDays);
+  out.updateEveryDays = Number.isFinite(days) && days >= 1 ? days : DEFAULTS.updateEveryDays;
   return out;
 }
 
@@ -292,3 +308,140 @@ async function safe(fn) {
     return null;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Self-update
+// Self-update. Every few weeks, compare the installed manifest's version with
+// the one on the repository's main branch, then notify or apply, per /config.
+//
+// A folder install (the plugin read from a git working copy) updates with
+// `git pull --ff-only`, which refuses rather than overwrite local edits. A
+// marketplace copy updates with `claude plugin update`. Either way the running
+// session keeps the old code until /reload-plugins; the toast says so.
+//
+// The check runs well after session start and off the prompt's path, and every
+// failure is swallowed: an updater must never cost the person a prompt.
+
+const SOURCE = "https://raw.githubusercontent.com/calebgrimes/fable-ladder/main/.claude-plugin/plugin.json";
+const INSTALL_ID = "ladder@fable-ladder";
+const LAST_CHECK = "updates.lastCheck";
+const LAST_RESULT = "updates.lastResult";
+const START_DELAY_MS = 20_000;
+const DAY_MS = 86_400_000;
+
+// Called from the ladder's own session.start hook (one plugin may register
+// session.start only once), well after the session is up.
+function scheduleUpdateCheck($, e, cfg) {
+  if (cfg.updates === "off" || e.isInteractive !== true) return;
+  try {
+    $.clock.after(START_DELAY_MS, () => checkForUpdate($, cfg, { force: false }));
+  } catch {
+    // An updater that cannot schedule itself is simply absent this session.
+  }
+}
+
+// Resolves what happened: "current", "available", "applied", "failed", or null
+// when nothing was checked (too soon, off, or unreachable).
+async function checkForUpdate($, cfg, { force }) {
+  try {
+    const now = await $.clock.now();
+    if (!force) {
+      const last = await $.store.get(LAST_CHECK);
+      if (typeof last === "number" && now - last < cfg.updateEveryDays * DAY_MS) return null;
+    }
+    // Claim the check before fetching, so several windows opening together make one request.
+    await $.store.set(LAST_CHECK, now);
+
+    const local = await localVersion($);
+    const remote = await remoteVersion($);
+    if (!local || !remote) {
+      await $.store.set(LAST_RESULT, { at: now, local, remote, outcome: "unreachable" });
+      if (force) $.ui.toast(`Ladder: could not read the ${local ? "published" : "installed"} version.`);
+      return null;
+    }
+    if (compareVersions(remote, local) <= 0) {
+      await $.store.set(LAST_RESULT, { at: now, local, remote, outcome: "current" });
+      if (force) $.ui.toast(`Ladder ${local} is current.`);
+      return "current";
+    }
+    if (cfg.updates !== "apply" && !force) {
+      await $.store.set(LAST_RESULT, { at: now, local, remote, outcome: "available" });
+      $.ui.toast(`Ladder ${remote} is out (installed: ${local}). /ladder update applies it.`, { timeoutMs: 10_000 });
+      return "available";
+    }
+    const applied = await apply($);
+    await $.store.set(LAST_RESULT, {
+      at: now,
+      local,
+      remote,
+      outcome: applied.ok ? "applied" : "failed",
+      detail: applied.detail,
+    });
+    if (applied.ok) {
+      $.ui.toast(`Ladder updated ${local} to ${remote}. /reload-plugins to run it.`, { timeoutMs: 10_000 });
+      return "applied";
+    }
+    $.ui.toast(`Ladder ${remote} is out but the update failed: ${applied.detail}. Update by hand.`, { timeoutMs: 10_000 });
+    return "failed";
+  } catch {
+    return null;
+  }
+}
+
+async function updateSummary($, cfg) {
+  const r = await safe(() => $.store.get(LAST_RESULT));
+  const when = r && typeof r.at === "number" ? new Date(r.at).toISOString().slice(0, 10) : "never";
+  const what = r && r.outcome ? `${r.outcome}${r.remote ? ` (published ${r.remote}, installed ${r.local ?? "?"})` : ""}` : "no check yet";
+  return `Updates: ${cfg.updates}, checked every ${cfg.updateEveryDays} days; last check ${when}: ${what}. /ladder update checks now.`;
+}
+
+async function localVersion($) {
+  try {
+    const raw = await $.fs.read(`${$.plugin.root}/.claude-plugin/plugin.json`);
+    const text = typeof raw === "string" ? raw : raw && typeof raw.text === "string" ? raw.text : "{}";
+    const v = JSON.parse(text).version;
+    return typeof v === "string" ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+async function remoteVersion($) {
+  try {
+    const res = await $.http.fetch(SOURCE, { headers: { "cache-control": "no-cache" } });
+    if (!res || !res.ok) return null;
+    const v = JSON.parse(res.text).version;
+    return typeof v === "string" ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+async function apply($) {
+  const root = $.plugin.root;
+  const isCheckout = (await safe(() => $.fs.exists(`${root}/.git`))) === true;
+  const argv = isCheckout ? ["git", "-C", root, "pull", "--ff-only"] : ["claude", "plugin", "update", INSTALL_ID];
+  try {
+    const out = await $.process.run(argv, { timeoutMs: 120_000 });
+    if (out && out.exitCode === 0) return { ok: true, detail: argv[0] };
+    return { ok: false, detail: oneLine((out && (out.stderr || out.stdout)) || `exit ${out?.exitCode}`) };
+  } catch (err) {
+    return { ok: false, detail: oneLine(err && err.message ? err.message : String(err)) };
+  }
+}
+
+// Positive when a is newer than b. Plain dotted numbers; anything else reads as 0.
+function compareVersions(a, b) {
+  const pa = String(a).split(".").map((n) => parseInt(n, 10) || 0);
+  const pb = String(b).split(".").map((n) => parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i += 1) {
+    const d = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (d) return d;
+  }
+  return 0;
+}
+
+function oneLine(s) {
+  return String(s ?? "").replace(/\s+/g, " ").trim().slice(0, 160);
+}
+

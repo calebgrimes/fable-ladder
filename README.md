@@ -34,6 +34,15 @@ One cost to know: a move re-reads the whole context on the new model once (the p
 carry across models). Moving down costs Sonnet tokens, which is the point. Moving up costs the top model
 one context read; the toast says how much, and `upSwitch` turns that direction off.
 
+## Updates
+
+Every 21 days (a `/config` row) the plugin compares its installed version with the one on this
+repository's `main` branch, twenty seconds into a session and never on the prompt's path. The
+default is **notify**: a notice says a newer version is out and `/ladder update` applies it. Set
+**apply** to have it pulled in on its own: a git checkout fast-forwards (local edits make it refuse,
+not overwrite); a marketplace copy runs `claude plugin update`. Either way the running session keeps
+the old code until `/reload-plugins`, and the notice says so. `/ladder` shows the last check.
+
 ## Install
 
 In a terminal session of Claude Code:
@@ -69,10 +78,10 @@ Planner overrides: `ORCH_MODEL` (default `claude-opus-5-5`, falls back to `opus`
 ```text
 .claude-plugin/plugin.json        the plugin and its /config rows
 .claude-plugin/marketplace.json   makes this repository installable
-hooks/hooks.json, hooks/ladder.mjs
+hooks/hooks.json, hooks/ladder.mjs   the ladder and its self-updater (one file: the engine follows $ only within a file)
 types/index.d.ts                  the state contract
 skills/orchestrate/               SKILL.md, scripts/ask_opus.sh, templates/
-tests/ladder.test.ts              run by `claude plugin test`
+tests/ladder.test.ts, tests/updater.test.ts   run by `claude plugin test`
 tests/test_skill.sh               layout, routing strings, house style, then validate and test
 ```
 

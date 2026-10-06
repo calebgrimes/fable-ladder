@@ -51,9 +51,17 @@ for s in 'sonnet (Sonnet 5.5)' 'haiku (Haiku 4.5)' 'claude-opus-5-5'; do
   grep -q -- "$s" "$skill/scripts/ask_opus.sh" && ok "helper has '$s'" || bad "helper missing '$s'"
 done
 if [[ -f "$mod" ]]; then
-  for s in 'const TIERS = \["haiku", "sonnet", "opus", "fable"\]' 'prompt.submit' 'prompt.compose' 'asUser: true' 'command: "model"' 'ladder:policy' '.catch((\$, e, next) => next(e))'; do
+  for s in 'const TIERS = \["haiku", "sonnet", "opus", "fable"\]' 'prompt.submit' 'prompt.compose' 'asUser: true' 'command: "model"' 'ladder:policy' '.catch((\$, e, next) => next(e))' 'scheduleUpdateCheck(\$, e, cfg)'; do
     grep -q -- "$s" "$mod" && ok "module has '$s'" || bad "module missing '$s'"
   done
+fi
+upd="$mod"
+if [[ -f "$upd" ]]; then
+  for s in 'raw.githubusercontent.com/calebgrimes/fable-ladder/main/.claude-plugin/plugin.json' '"--ff-only"' '"claude", "plugin", "update"' 'updates.lastCheck' 'e.isInteractive !== true'; do
+    grep -q -- "$s" "$upd" && ok "updater has '$s'" || bad "updater missing '$s'"
+  done
+  python3 -c "import json,sys; d=json.load(open(sys.argv[1])); u=d['userConfig']; assert u['updates']['default']=='notify' and set(u['updates']['options'])=={'notify','apply','off'} and u['updateEveryDays']['default']==21" "$repo_root/.claude-plugin/plugin.json" \
+    && ok "manifest update rows" || bad "manifest update rows"
 fi
 
 # House style and hygiene, repo-wide.
