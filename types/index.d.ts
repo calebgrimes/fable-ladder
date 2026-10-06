@@ -1,19 +1,9 @@
-export type LadderMode = "auto" | "pin" | "off";
-
-export type LadderState = {
-  mode: LadderMode;
-  interactive: boolean;
-  setTier: string | null;
-  pinUntilTurn: number;
-  lastSwitchTurn: number;
-  lastLabel: string | null;
-  switches: number;
+// The ladder keeps no session state: it neither switches models nor tracks
+// prompts. Update bookkeeping lives in the plugin store.
+export type LadderUpdateResult = {
+  at: number;
+  local: string | null;
+  remote: string | null;
+  outcome: "current" | "available" | "applied" | "failed" | "unreachable";
+  detail?: string;
 };
-
-declare module "claude-code" {
-  interface PluginState {
-    ladder: {
-      state: LadderState;
-    };
-  }
-}

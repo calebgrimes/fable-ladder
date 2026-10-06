@@ -30,9 +30,7 @@ h = json.load(open(os.path.join(r, "hooks/hooks.json")))
 assert p["name"] == "ladder" and p.get("types") == "./types/index.d.ts"
 assert any(x["name"] == "ladder" for x in m["plugins"])
 assert h["modules"] == ["./ladder.mjs"]
-for k in ("enabled", "ceiling", "floor", "upSwitch", "holdTurns", "minChars", "classifier"):
-    assert k in p["userConfig"], k
-assert p["userConfig"]["floor"]["default"] == "sonnet"
+assert set(p["userConfig"]) == {"updates", "updateEveryDays"}
 EOF
 
 # Shell
@@ -64,7 +62,7 @@ for s in 'sonnet (Sonnet 5.5)' 'haiku (Haiku 4.5)' 'claude-opus-5-5'; do
   grep -q -- "$s" "$skill/scripts/ask_opus.sh" && ok "helper has '$s'" || bad "helper missing '$s'"
 done
 if [[ -f "$mod" ]]; then
-  for s in 'const TIERS = \["haiku", "sonnet", "opus", "fable"\]' 'prompt.submit' 'prompt.compose' 'asUser: true' 'command: "model"' 'ladder:policy' '.catch((\$, e, next) => next(e))' 'scheduleUpdateCheck(\$, e, cfg)' 're-dispatch one' 'next similar task one tier lower'; do
+  for s in 'ladder:policy' '.catch((\$, e, next) => next(e))' 'scheduleUpdateCheck(\$, e, cfg)' 're-dispatch one' 'next similar task one tier lower'; do
     grep -q -- "$s" "$mod" && ok "module has '$s'" || bad "module missing '$s'"
   done
 fi
