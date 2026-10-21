@@ -18,7 +18,7 @@ function world(on: any) {
   on("session.start", ($: any, e: any) => ({ cwd: e.cwd }));
   on("session.model", () => ({ value: "claude-fable-5-1" }));
   on("command.register", () => ({ value: { command: "ladder" } }));
-  on("fs.read", () => ({ value: JSON.stringify({ name: "ladder", version: "0.5.0" }) }));
+  on("fs.read", () => ({ value: JSON.stringify({ name: "ladder", version: "0.5.1" }) }));
   on("store.get", () => ({ value: undefined }));
   on("model.complete", () => {
     w.completes += 1;
@@ -72,7 +72,7 @@ describe("ladder", () => {
     world(on);
     await start($);
     const out: any = await $.command.run({ command: "ladder", args: "", origin: { kind: "composer" } } as any);
-    expect(out.text).toMatch(/Ladder 0\.5\.0/);
+    expect(out.text).toMatch(/Ladder 0\.5\.1/);
     expect(out.text).toMatch(/does not switch the session model/);
   });
 
@@ -80,6 +80,6 @@ describe("ladder", () => {
     world(on);
     await start($);
     const out: any = await $.command.run({ command: "ladder", args: "pin", origin: { kind: "composer" } } as any);
-    expect(out.text).toMatch(/Ladder 0\.5\.0/);
+    expect(out.text).toMatch(/Ladder 0\.5\.1/);
   });
 });

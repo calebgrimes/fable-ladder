@@ -93,10 +93,10 @@ if grep -rIqE 'sk-ant-|ghp_|AKIA[0-9A-Z]{16}|BEGIN [A-Z ]*PRIVATE KEY|/Users/[a-
 # README: the parts a stranger needs (uninstall, platforms, the fill-in, the lock from a clone).
 for s in '## Uninstall' 'gatectl" uninstall' 'plugin uninstall ladder@fable-ladder' 'marketplace remove fable-ladder' \
          'rm -rf ~/.claude/conductor-gate' 'Windows: not supported yet.' 'only when the Agent call has none' \
-         'overrides the model in an agent' 'git clone --depth 1 --branch v0.5.0' 'This window:' 'All windows:' 'The plugin:'; do
+         'overrides the model in an agent' 'git clone --depth 1 --branch v0.5.1' 'This window:' 'All windows:' 'The plugin:'; do
   grep -qF -- "$s" "$repo_root/README.md" && ok "README has '$s'" || bad "README missing '$s'"
 done
-grep -qF -- 'v0.5.0' "$repo_root/gate/lock/install.sh" && grep -qF -- 'plugin cache' "$repo_root/gate/lock/install.sh" \
+grep -qF -- 'v0.5.1' "$repo_root/gate/lock/install.sh" && grep -qF -- 'plugin cache' "$repo_root/gate/lock/install.sh" \
   && ok "install.sh names the release tag and refuses the plugin cache" || bad "install.sh tag and cache check"
 
 rc=0; printf '' | "$skill/scripts/ask_opus.sh" >/dev/null 2>&1 || rc=$?; [[ $rc -eq 64 ]] && ok "empty packet refused" || bad "empty packet refused (rc=$rc)"

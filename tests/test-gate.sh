@@ -303,7 +303,7 @@ t "write project settings.local.json" 2 "$(b Edit $APP file_path $APP/.claude/se
 t "write ~/.claude/agents/x.md" 2 "$(b Write $APP file_path $H/.claude/agents/x.md)"
 t "write plans dir" 0 "$(b Write $APP file_path $H/.claude/plans/p.md)"
 t "memory folder of non-app cwd" 0 "$(b Write $DOCS file_path $H/.claude/projects/${DOCS_SLUG}/memory/x.md '' '' $TX_FABLE)"
-t "memory folder of another project -> deny [R6 cwd: /conduct on]" 2 "$(b Write $DOCS file_path $H/.claude/projects/${APP_SLUG}/memory/x.md '' '' $CON_ON)"
+t "memory folder of another project -> allow [0.5.1 memory notes, /conduct on]" 0 "$(b Write $DOCS file_path $H/.claude/projects/${APP_SLUG}/memory/x.md '' '' $CON_ON)"
 t "memory folder of dotted cwd" 0 "$(b Write $H/.claude file_path $H/.claude/projects/${HC_SLUG}/memory/x.md '' '' $TX_FABLE)"
 
 echo "== gatectl lines (Fix 9) =="
@@ -936,7 +936,7 @@ echo "$(b Bash $W command 'ls /' '' '' "$OKT")" | "${PYX[@]}" "$GATE" "${GA[@]}"
 : > "$DL"
 echo "$(b Bash $ENF command 'ls /' '' '' "$OKT")" | "${PYX[@]}" "$GATE" "${GA[@]}" --root "$R" --log "$DL" >/dev/null 2>&1
 grep -q '"decision": "ALLOW-DIRECT"' "$DL"; ok $? "ALLOW-DIRECT logged in enforce [R6 cwd]"
-tg "conductor deny message names /direct" 2 "$(b Bash $APP command 'ls /')" "the user starts the message with /direct"
+tg "conductor deny message: ask once with /direct" 2 "$(b Bash $APP command 'ls /')" "Reply /direct and I'll do it myself."
 tg "conductor deny message keeps the off switch" 2 "$(b Bash $APP command 'ls /')" "Off switch: owner only, in a plain Terminal window"
 echo "$(b Bash $APP command 'ls /' agent-5 $SO)" | "${PYX[@]}" "$GATE" "${GA[@]}" --root "$R" --log "$LOG" >/dev/null 2>"$TMP/err"
 ! grep -q '/direct' "$TMP/err"; ok $? "suborch deny message does not name /direct"
@@ -1553,7 +1553,7 @@ r6q "guards: Write own memory ../memory/conductor-gate-x.md (same folder) -> pas
 r6 "guards: Write own memory conductor-gate-x.json (not .md) -> deny" 2 "$(b Write $G file_path $GMEM/conductor-gate-x.json)"
 r6 "guards: Write own project folder ../conductor-gate-x.md (not memory) -> deny" 2 "$(b Write $G file_path $GMEM/../conductor-gate-x.md)"
 r6 "guards: Write own memory ../../../plans/conductor-gate-x.md -> deny" 2 "$(b Write $G file_path $GMEM/../../../plans/conductor-gate-x.md)"
-r6 "guards: Write another project's memory conductor-gate-x.md -> deny" 2 "$(b Write $G file_path $MEM/conductor-gate-x.md)"
+r6 "guards: Write another project's memory conductor-gate-x.md -> allow [0.5.1 memory notes]" 0 "$(b Write $G file_path $MEM/conductor-gate-x.md)"
 r6 "guards: NotebookEdit own memory conductor-gate-x.md -> deny (Write and Edit only)" 2 "$(b NotebookEdit $G notebook_path $GMEM/conductor-gate-x.md)"
 r6 "guards: Write plans/conductor-gate-x.md -> deny" 2 "$(b Write $G file_path $IMP/conductor-gate-x.md)"
 r6 "guards: Write the sessions folder x.md -> deny" 2 "$(b Write $G file_path $H/.claude/conductor-gate/sessions/x.md)"
@@ -1562,7 +1562,7 @@ r6 "guards: Bash append to own memory conductor-gate note -> deny (Bash text mat
 r6 "enforce: Write own memory conductor-gate-global-decisions.md -> allow" 0 "$(b Write $APP file_path $MEM/conductor-gate-global-decisions.md)"
 r6 "enforce: Edit own memory Conductor-Gate-X.MD (case) -> allow" 0 "$(b Edit $APP file_path $MEM/Conductor-Gate-X.MD)"
 r6 "enforce: Write own memory conductor-gate-x.json -> deny" 2 "$(b Write $APP file_path $MEM/conductor-gate-x.json)"
-r6 "enforce: Write another project's memory conductor-gate-x.md -> deny" 2 "$(b Write $APP file_path $HMEM/conductor-gate-x.md)"
+r6 "enforce: Write another project's memory conductor-gate-x.md -> allow [0.5.1 memory notes]" 0 "$(b Write $APP file_path $HMEM/conductor-gate-x.md)"
 r6 "enforce: Write own memory ../../${DOCS_SLUG}/memory/conductor-gate-x.md -> deny" 2 "$(b Write $APP file_path $MEM/../../${DOCS_SLUG}/memory/conductor-gate-x.md)"
 r6 "enforce: Write plans/conductor-gate-x.md -> deny" 2 "$(b Write $APP file_path $IMP/conductor-gate-x.md)"
 # Symlinks inside an own memory folder. The test makes a temp project memory folder and removes it.
@@ -1888,7 +1888,7 @@ t "/otherplugin:conduct on does not count -> guards" 0 "$(b Bash $OTHER command 
 
 echo "== PLUGIN: deny messages point only at parts the plugin ships =="
 tg "deny names subagent_type ladder:suborchestrator" 2 "$(b Bash $APP command 'ls /')" 'ladder:suborchestrator'
-tg "deny names /conduct off" 2 "$(b Bash $APP command 'ls /')" '/conduct off'
+tg "deny says: dispatch a worker now" 2 "$(b Bash $APP command 'ls /')" 'dispatch a worker now with the Agent tool'
 tg "deny points at Turn it off in the README" 2 "$(b Bash $APP command 'ls /')" 'Turn it off'
 grep -q '^### Turn it off' "$PLUGIN/README.md"; ok $? "README has the Turn it off section that the deny names"
 bad=0
@@ -2142,6 +2142,77 @@ echo "$(b Bash $ENF command "python3 -I \"$FP/skills/conduct/scripts/gate_status
 echo "$(b Bash $ENF command "python3 -I \"$DOCS/skills/conduct/scripts/gate_status.py\" s1")" | /usr/bin/env -i HOME="$H" CLAUDE_PLUGIN_ROOT="$DOCS" "$PY" -I "$FPG" "${GA[@]}" --log "$TMP/fp.jsonl" >/dev/null 2>&1; [ $? = 2 ]; ok $? "a CLAUDE_PLUGIN_ROOT that is not this plugin is ignored (deny)"
 echo "$(b Bash $ENF command "$STC")" | /usr/bin/env -i HOME="$H" PATH="$PB" /bin/sh "$FPL/gate/run.sh" "${GA[@]}" --log "$TMP/fp.jsonl" >/dev/null 2>&1; [ $? = 0 ]; ok $? "run.sh by the symlink path passes the plugin path on (status command passes)"
 echo "$(b Bash $DOCS command "rm -rf $FPL/gate")" | /usr/bin/env -i HOME="$H" CLAUDE_PLUGIN_ROOT="$FPL" "$PY" -I "$FPG" "${GA[@]}" --log "$TMP/fp.jsonl" >/dev/null 2>&1; [ $? = 2 ]; ok $? "guards: rm -rf of the gate folder by the symlink path -> deny"
+
+echo "== 0.5.1 A: Claude memory notes pass in every mode =="
+ML="$TMP/mem.jsonl"
+OMEM="$H/.claude/projects/$(slug "$OTHER")/memory"   # another project's memory folder
+mt() {  # mt name want json [root]: also check the log for ALLOW-MEMORY when want is 0
+  local root="${4:-$R}"; : > "$ML"
+  echo "$3" | "${PYX[@]}" "$GATE" "${GA[@]}" --root "$root" --log "$ML" >"$TMP/out" 2>"$TMP/err"; rc=$?
+  if [ "$2" = 0 ]; then [ "$rc" = 0 ] && grep -q '"decision": "ALLOW-MEMORY"' "$ML"; else [ "$rc" = "$2" ] && ! grep -q 'ALLOW-MEMORY' "$ML"; fi
+  ok $? "$1"
+}
+for tool in Write Edit; do
+  mt "enforce: $tool another project's memory x.md -> ALLOW-MEMORY" 0 "$(b $tool $APP file_path $OMEM/x.md)"
+  mt "enforce: $tool another project's MEMORY.md -> ALLOW-MEMORY" 0 "$(b $tool $ENF file_path $OMEM/MEMORY.md)"
+  mt "guards: $tool another project's memory x.md -> ALLOW-MEMORY" 0 "$(b $tool $DOCS file_path $OMEM/x.md)"
+  mt "warn: $tool another project's memory x.md -> ALLOW-MEMORY" 0 "$(b $tool $H/test/warn file_path $OMEM/x.md)" "$R2"
+  mt "/conduct on: $tool another project's memory x.md -> ALLOW-MEMORY" 0 "$(b $tool $DOCS file_path $OMEM/x.md '' '' $CON_ON)"
+  mt "suborch: $tool another project's memory x.md -> ALLOW-MEMORY" 0 "$(b $tool $APP file_path $OMEM/x.md agent-5 $SO)"
+done
+JXM="{\"file_path\":\"$OMEM/x.md\",\"edits\":[{\"old_string\":\"a\",\"new_string\":\"b\"}]}"
+mt "enforce: MultiEdit another project's memory x.md -> ALLOW-MEMORY" 0 "$(gi MultiEdit $APP "$JXM")"
+mt "enforce: ~/.claude form of a memory note -> ALLOW-MEMORY" 0 "$(b Write $APP file_path "~/.claude/projects/$(slug "$OTHER")/memory/x.md")"
+mt "enforce: relative path into the memory folder -> ALLOW-MEMORY" 0 "$(b Write $H/.claude/projects file_path "$(slug "$OTHER")/memory/x.md")"
+mt "enforce: a .. in the path -> no exception (deny)" 2 "$(b Write $APP file_path $OMEM/../memory/x.md)"
+mt "enforce: a subfolder under memory/ -> no exception (deny)" 2 "$(b Write $APP file_path $OMEM/sub/x.md)"
+mt "enforce: a .txt note -> no exception (deny)" 2 "$(b Write $APP file_path $OMEM/x.txt)"
+mt "enforce: a file next to memory/ -> no exception (deny)" 2 "$(b Write $APP file_path $H/.claude/projects/$(slug "$OTHER")/x.md)"
+mt "enforce: a folder named memory elsewhere -> no exception (deny)" 2 "$(b Write $APP file_path $H/work/projects/p/memory/x.md)"
+mt "enforce: NotebookEdit of a memory note -> no exception (deny)" 2 "$(b NotebookEdit $APP notebook_path $OMEM/x.md)"
+mt "enforce: Bash append to a memory note -> deny (no Bash exception)" 2 "$(b Bash $APP command "echo x >> $OMEM/x.md")"
+# Symlinks: a temp project memory folder inside the test HOME.
+SMEM="$H/.claude/projects/-sym-test/memory"; mkdir -p "$SMEM" "$H/elsewhere"
+ln -s "$H/elsewhere/t.md" "$SMEM/link.md"; ln -s "$H/elsewhere" "$H/.claude/projects/-sym-dir"
+mt "a symlinked note file -> no exception (deny in enforce)" 2 "$(b Write $APP file_path $SMEM/link.md)"
+mt "a symlinked project folder -> no exception (deny in enforce)" 2 "$(b Write $APP file_path $H/.claude/projects/-sym-dir/memory/x.md)"
+mt "a plain note in the same temp folder -> ALLOW-MEMORY" 0 "$(b Write $APP file_path $SMEM/real.md)"
+# A deny folder over the memory folder wins.
+python3 - "$R/config.json" "$TMP/rootm/config.json" "$OMEM" <<'PY'
+import json, os, sys
+c = json.load(open(sys.argv[1])); c["deny_write_dirs"].append(sys.argv[3])
+os.makedirs(os.path.dirname(sys.argv[2]), exist_ok=True); json.dump(c, open(sys.argv[2], "w"))
+PY
+mt "a memory folder in deny_write_dirs -> no exception (tamper deny)" 2 "$(b Write $DOCS file_path $OMEM/x.md)" "$TMP/rootm"
+# H1: the shape is case-sensitive. Other cases get the normal rules.
+OSL="$(slug "$OTHER")"
+mt "H1 enforce: .CLAUDE in the path -> no exception (deny)" 2 "$(b Write $APP file_path $H/.CLAUDE/projects/$OSL/memory/x.md)"
+mt "H1 enforce: PROJECTS in the path -> no exception (deny)" 2 "$(b Write $APP file_path $H/.claude/PROJECTS/$OSL/memory/x.md)"
+mt "H1 enforce: MEMORY in the path -> no exception (deny)" 2 "$(b Write $APP file_path $H/.claude/projects/$OSL/MEMORY/x.md)"
+mt "H1 enforce: a .MD note -> no exception (deny)" 2 "$(b Write $APP file_path $OMEM/x.MD)"
+mt "H1 enforce: the normal case still passes -> ALLOW-MEMORY" 0 "$(b Write $APP file_path $OMEM/MEMORY.md)"
+# H2: a hard link to a gate file gets no exception.
+mkdir -p "$OMEM" "$CG"; echo '{}' > "$CG/hl-target.json"; rm -f "$OMEM/hard.md"; ln "$CG/hl-target.json" "$OMEM/hard.md"
+mt "H2 enforce: Edit a hard link to a gate file -> no exception (deny)" 2 "$(b Edit $APP file_path $OMEM/hard.md)"
+mt "H2 /conduct on: Write a hard link to a gate file -> no exception (deny)" 2 "$(b Write $DOCS file_path $OMEM/hard.md '' '' $CON_ON)"
+: > "$ML"; echo "$(b Edit $DOCS file_path $OMEM/hard.md)" | "${PYX[@]}" "$GATE" "${GA[@]}" --root "$R" --log "$ML" >/dev/null 2>&1
+! grep -q 'ALLOW-MEMORY' "$ML"; ok $? "H2 guards: a hard link is not logged ALLOW-MEMORY"
+echo x > "$OMEM/single.md"
+mt "H2 enforce: Edit an existing note with one link -> ALLOW-MEMORY" 0 "$(b Edit $APP file_path $OMEM/single.md)"
+rm -f "$OMEM/hard.md" "$CG/hl-target.json" "$OMEM/single.md"
+
+echo "== 0.5.1 B: ask once, then delegate =="
+tg "deny: the ask line" 2 "$(b Bash $APP command 'ls /')" "If the job is small, ask the user in one line: 'Reply /direct and I'll do it myself.'"
+tg "deny: dispatch now, do not wait" 2 "$(b Bash $APP command 'ls /')" 'Then dispatch a worker now with the Agent tool .*Do not wait for the answer.'
+tg "deny: closed in conductor mode" 2 "$(b Bash $APP command 'ls /')" 'this tool is closed to the main window in conductor mode'
+tg "/conduct on: the same message" 2 "$(b Bash $DOCS command 'ls /' '' '' $CON_ON)" "Reply /direct and I'll do it myself."
+tg "D2 deny: check or stop a started worker after /direct" 2 "$(b Bash $APP command 'ls /')" 'If the user replies /direct after a worker started, check or stop that worker first, so the job is not done twice.'
+tg "H3 deny: never use a worker on the gate" 2 "$(b Bash $APP command 'ls /')" 'Never use a worker to change the gate, its config, or its OFF file.'
+echo "$(b Bash $APP command 'ls /')" | "${PYX[@]}" "$GATE" "${GA[@]}" --root "$TMP/root5" --log "$LOG" >/dev/null 2>"$TMP/err"
+grep -q '^Conductor gate: .*Dispatch a worker now' "$TMP/err" && ! grep -q 'Do not wait' "$TMP/err"; ok $? "allow_direct_skill false: dispatch now, no ask line"
+grep -q 'Never use a worker to change the gate, its config, or its OFF file.' "$TMP/err"; ok $? "allow_direct_skill false: H3 line still there"
+echo "$(b Bash $APP command 'ls /')" | "${PYX[@]}" "$GATE" "${GA[@]}" --root "$R" --log "$LOG" >/dev/null 2>"$TMP/err"
+! grep -qiE 'timeout|auto-allow|/conduct off' "$TMP/err"; ok $? "deny: no timeout, no auto-allow, no /conduct off advice"
 
 echo "== Timing: 20 calls =="
 IN="$(b Bash $APP command 'ls /' '' '' $TX_SONNET)"

@@ -3,7 +3,7 @@
 # settings. Then a Claude session cannot turn the gate off or edit its rules.
 # Run it yourself in a plain Terminal window, not from Claude (it asks on the tty).
 # Run it from a fresh git clone at the release tag, not from the plugin cache:
-#   git clone --depth 1 --branch v0.5.0 https://github.com/calebgrimes/fable-ladder ~/fable-ladder-lock
+#   git clone --depth 1 --branch v0.5.1 https://github.com/calebgrimes/fable-ladder ~/fable-ladder-lock
 #   sudo bash ~/fable-ladder-lock/gate/lock/install.sh
 # macOS is tested. Linux (/etc/claude-code) is written but not tested.
 set -euo pipefail

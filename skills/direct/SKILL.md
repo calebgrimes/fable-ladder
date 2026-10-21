@@ -11,6 +11,7 @@ The user allowed direct, hands-on work for this turn only.
 The conductor gate lets the main window act until the next message from the user.
 
 Do the task in $ARGUMENTS yourself. Do not dispatch it to a worker.
+If a worker already started on this job, check its report or stop it (TaskStop) first, so the job is not done twice.
 If $ARGUMENTS is empty, ask the user what to do.
 
 The money guards still apply. Do not start a Fable worker, a Fable fork, or a Workflow with fable unless the user approves it.

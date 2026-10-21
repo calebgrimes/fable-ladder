@@ -7,7 +7,7 @@
     {
       "name": "ladder",
       "source": "./",
-      "version": "0.5.0",
+      "version": "0.5.1",
       "description": "Model-ladder orchestration (/orchestrate) plus the conductor gate: /conduct, /direct, money guards, and an optional root lock."
     }
   ],

@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.5.1
+
+Added:
+- Memory notes: the conductor and the sub-orchestrator may Write and Edit Claude's memory notes
+  (`~/.claude/projects/<project>/memory/<name>.md`, also `MEMORY.md`) in every mode, for any project.
+  The gate logs ALLOW-MEMORY. A symlink, a `..` part, a subfolder under `memory/`, a file that is not
+  `.md`, a hard link, a path in other letter case, and a path in a gate folder do not get this rule.
+  Bash writes keep the normal rules.
+
+Changed:
+- Ask once, then delegate: when the gate blocks a hands-on call of the main window, the message
+  tells Claude to ask the user in one line ("Reply /direct and I'll do it myself.") if the job is
+  small, and then to dispatch a worker at once without waiting for the answer. There is no timeout
+  and no auto-allow. The `/orchestrate` skill and the sub-orchestrator agent say the same.
+- The deny message also says: never use a worker to change the gate, its config, or its OFF file.
+  If the user replies `/direct` after a worker started, check or stop that worker first, so the job
+  is not done twice. The `/direct` skill says the same.
+- Known limits: the gate does not judge memory note content. Check the ALLOW-MEMORY rows in the log.
+- The lock steps use the tag `v0.5.1`.
+
 ## 0.5.0
 
 Added:
