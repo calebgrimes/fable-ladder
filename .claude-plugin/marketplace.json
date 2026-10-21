@@ -6,8 +6,10 @@
   "plugins": [
     {
       "name": "ladder",
-      "source": "./"
+      "source": "./",
+      "version": "0.5.0",
+      "description": "Model-ladder orchestration (/orchestrate) plus the conductor gate: /conduct, /direct, money guards, and an optional root lock."
     }
   ],
-  "description": "The ladder plugin: the /orchestrate conductor skill, an always-on delegation policy, and a self-updater. It never switches the session model."
+  "description": "The ladder plugin: the /orchestrate conductor skill, an always-on delegation policy, a self-updater, and the conductor gate. It never switches the session model."
 }

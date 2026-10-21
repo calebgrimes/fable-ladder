@@ -194,6 +194,14 @@ a skills folder it is `scripts/ask_opus.sh` under that folder.
 printf '%s' "$PACKET" | "<that path>/scripts/ask_opus.sh"
 ```
 
+If the conductor gate of this plugin is in enforce mode for the window, the gate
+blocks the pipe form. Then write the packet to `.orchestrate/packet.md` and run
+the helper with that file as input. The gate allows this exact form:
+
+```bash
+"<that path>/scripts/ask_opus.sh" < .orchestrate/packet.md
+```
+
 The helper calls Claude Code headless with no tools and no saved session, so
 the plan costs the conducting window only its answer. Overrides: `ORCH_MODEL`
 (default `claude-opus-5-5`, falls back to the `opus` alias), `ORCH_EFFORT`
