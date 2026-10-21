@@ -1,3 +1,19 @@
 {
-  "modules": ["./ladder.mjs"]
+  "modules": [
+    "./ladder.mjs"
+  ],
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/gate/run.sh\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
 }

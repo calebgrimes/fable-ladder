@@ -13,12 +13,15 @@ bad() { printf 'FAIL  %s\n' "$1"; fail=1; }
 # Layout
 for f in .claude-plugin/plugin.json .claude-plugin/marketplace.json hooks/hooks.json types/index.d.ts \
          skills/orchestrate/SKILL.md skills/orchestrate/scripts/ask_opus.sh \
-         skills/orchestrate/templates/brief.md skills/orchestrate/templates/board.md skills/orchestrate/templates/tier-log.md tests/ladder.test.ts; do
+         skills/orchestrate/templates/brief.md skills/orchestrate/templates/board.md skills/orchestrate/templates/tier-log.md tests/ladder.test.ts \
+         hooks/gate-status.mjs gate/run.sh gate/conductor-gate.py gate/config.json gate/lock/install.sh gate/lock/uninstall.sh gate/lock/gatectl \
+         agents/suborchestrator.md skills/conduct/SKILL.md skills/conduct/scripts/gate_status.py skills/direct/SKILL.md \
+         tests/test-gate.sh CHANGELOG.md LICENSE; do
   [[ -f "$repo_root/$f" ]] && ok "present $f" || bad "missing $f"
 done
 [[ -f "$mod" ]] && ok "present hooks/ladder.mjs" || bad "missing hooks/ladder.mjs (the hooks module)"
 
-for j in .claude-plugin/plugin.json .claude-plugin/marketplace.json hooks/hooks.json; do
+for j in .claude-plugin/plugin.json .claude-plugin/marketplace.json hooks/hooks.json gate/config.json; do
   python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$repo_root/$j" 2>/dev/null && ok "json $j" || bad "json $j"
 done
 python3 - "$repo_root" <<'EOF' && ok "manifest names ladder and the module" || bad "manifest names ladder and the module"
@@ -30,14 +33,20 @@ h = json.load(open(os.path.join(r, "hooks/hooks.json")))
 assert p["name"] == "ladder" and p.get("types") == "./types/index.d.ts"
 assert any(x["name"] == "ladder" for x in m["plugins"])
 assert h["modules"] == ["./ladder.mjs"]
+pre = h["hooks"]["PreToolUse"]
+assert len(pre) == 1 and pre[0]["hooks"][0]["command"] == 'sh "${CLAUDE_PLUGIN_ROOT}/gate/run.sh"'
+assert p["version"] == m["plugins"][0]["version"]
 assert set(p["userConfig"]) == {"updates", "updateEveryDays"}
 EOF
 
 # Shell
-for f in "$skill/scripts/ask_opus.sh" "$repo_root/tests/test_skill.sh"; do
+for f in "$skill/scripts/ask_opus.sh" "$repo_root/tests/test_skill.sh" "$repo_root/tests/test-gate.sh" \
+         "$repo_root/gate/lock/install.sh" "$repo_root/gate/lock/uninstall.sh" "$repo_root/gate/lock/gatectl"; do
   bash -n "$f" && ok "syntax $(basename "$f")" || bad "syntax $(basename "$f")"
 done
 [[ -x "$skill/scripts/ask_opus.sh" ]] && ok "helper executable" || bad "helper executable"
+sh -n "$repo_root/gate/run.sh" && ok "syntax run.sh" || bad "syntax run.sh"
+python3 -c "import ast,sys;ast.parse(open(sys.argv[1]).read(),feature_version=(3,9))" "$repo_root/gate/conductor-gate.py" && ok "gate parses as Python 3.9" || bad "gate parses as Python 3.9"
 
 # Routing strings: Fable on top, Opus as planner, Sonnet default, Haiku bulk.
 head -1 "$skill/SKILL.md" | grep -qx -- '---' && grep -q '^name: orchestrate$' "$skill/SKILL.md" \
@@ -81,7 +90,22 @@ if grep -rIq $'\xe2\x80\x94' --exclude-dir=.git "$repo_root"; then bad "em dash 
 if grep -rIqE 'sk-ant-|ghp_|AKIA[0-9A-Z]{16}|BEGIN [A-Z ]*PRIVATE KEY|/Users/[a-z]' --exclude-dir=.git --exclude=.git --exclude=test_skill.sh "$repo_root"; then
   bad "credential or personal path found"; else ok "no credentials or personal paths"; fi
 
+# README: the parts a stranger needs (uninstall, platforms, the fill-in, the lock from a clone).
+for s in '## Uninstall' 'gatectl" uninstall' 'plugin uninstall ladder@fable-ladder' 'marketplace remove fable-ladder' \
+         'rm -rf ~/.claude/conductor-gate' 'Windows: not supported yet.' 'only when the Agent call has none' \
+         'overrides the model in an agent' 'git clone --depth 1 --branch v0.5.0' 'This window:' 'All windows:' 'The plugin:'; do
+  grep -qF -- "$s" "$repo_root/README.md" && ok "README has '$s'" || bad "README missing '$s'"
+done
+grep -qF -- 'v0.5.0' "$repo_root/gate/lock/install.sh" && grep -qF -- 'plugin cache' "$repo_root/gate/lock/install.sh" \
+  && ok "install.sh names the release tag and refuses the plugin cache" || bad "install.sh tag and cache check"
+
 rc=0; printf '' | "$skill/scripts/ask_opus.sh" >/dev/null 2>&1 || rc=$?; [[ $rc -eq 64 ]] && ok "empty packet refused" || bad "empty packet refused (rc=$rc)"
+
+# The gate suite: synthetic fixtures, a temp HOME. Slow (a few minutes), so --quick skips it.
+if [[ "${1:-}" != "--quick" ]]; then
+  if out="$(bash "$repo_root/tests/test-gate.sh" 2>&1)"; then ok "gate suite: $(printf '%s\n' "$out" | grep '^RESULT:')"
+  else bad "gate suite"; printf '%s\n' "$out" | grep -E '^FAIL|^RESULT' | tail -40; fi
+fi
 
 # The engine's own reads of the plugin. Skipped with a note when claude is absent.
 if command -v claude >/dev/null 2>&1 && [[ -f "$mod" ]]; then

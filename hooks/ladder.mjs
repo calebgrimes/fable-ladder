@@ -7,6 +7,8 @@
 // itself current with the self-updater below. The conductor skill lives in
 // skills/orchestrate.
 
+import { gateStatusHooks, gateStatusStart } from "./gate-status.mjs";
+
 const DEFAULTS = {
   updates: "notify",
   updateEveryDays: 21,
@@ -41,8 +43,11 @@ export function register(on, options = {}) {
       }),
     );
     scheduleUpdateCheck($, e, cfg);
+    await safe(() => gateStatusStart($));
     return result;
   });
+
+  gateStatusHooks(on);
 
   on("prompt.compose", async ($, e, next) => {
     const result = await next(e);

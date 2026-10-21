@@ -1,0 +1,58 @@
+#!/bin/bash
+# gatectl: the root-owned helper of the locked conductor gate. Run it with sudo,
+# yourself, in a plain Terminal window.
+#   sudo gatectl off | on | status | propose <file> | uninstall
+set -euo pipefail
+cd /
+umask 022
+case "$(uname -s)" in
+  Darwin) CC="/Library/Application Support/ClaudeCode"; GROUP=wheel ;;
+  *) CC="/etc/claude-code"; GROUP=root ;;
+esac
+ROOT="$CC/conductor-gate"
+# install.sh writes the Python path here.
+PYBIN="@PYBIN@"
+
+if [ "$(id -u)" != 0 ]; then echo "Run with sudo."; exit 1; fi
+cmd="${1:-}"
+case "$cmd" in
+  off)
+    touch "$ROOT/OFF"; chown root:"$GROUP" "$ROOT/OFF"; chmod 644 "$ROOT/OFF"
+    echo "Gate is OFF." ;;
+  on)
+    rm -f "$ROOT/OFF"
+    echo "Gate is ON." ;;
+  status)
+    if [ -e "$ROOT/OFF" ]; then echo "Gate is OFF (locked copy)."; else echo "Gate is ON (locked copy)."; fi ;;
+  propose)
+    PROPOSED="${2:-}"
+    if [ -z "$PROPOSED" ]; then echo "Usage: sudo gatectl propose <new-config.json>"; exit 1; fi
+    TMPF="$(mktemp /tmp/gate-lock.XXXXXX)"
+    trap 'rm -f "$TMPF"' EXIT
+    # Read the proposal ONCE. Refuse a symlink. The root temp file is what we install.
+    "$PYBIN" -I - "$PROPOSED" "$TMPF" <<'PY'
+import os, sys, json
+src, dst = sys.argv[1:3]
+fd = os.open(src, os.O_RDONLY | os.O_NOFOLLOW)
+data = os.read(fd, 1 << 20)
+os.close(fd)
+if not isinstance(json.loads(data.decode("utf-8")), dict):
+    raise SystemExit("config must be a JSON object")
+with open(dst, "wb") as fh:
+    fh.write(data)
+PY
+    echo "---- diff (current -> proposed) ----"
+    diff "$ROOT/config.json" "$TMPF" || true
+    printf 'Install THIS config? (y/N) '
+    read -r ANSWER </dev/tty
+    if [ "$ANSWER" != y ]; then echo "Cancelled. Nothing changed."; exit 1; fi
+    mkdir -p "$ROOT/backups"
+    cp -p "$ROOT/config.json" "$ROOT/backups/config.json.$(date +%Y%m%d-%H%M%S)"
+    install -m 644 -o root -g "$GROUP" "$TMPF" "$ROOT/config.json"
+    echo "Config installed." ;;
+  uninstall)
+    bash "$ROOT/uninstall.sh" ;;
+  *)
+    echo "Usage: sudo gatectl off|on|status|propose <file>|uninstall"; exit 1 ;;
+esac
+sudo -k

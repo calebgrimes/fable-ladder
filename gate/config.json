@@ -1,0 +1,131 @@
+{
+  "model_signal": "transcript",
+  "headless_mode": "log",
+  "allow_open_command": true,
+  "allow_direct_skill": true,
+  "allow_conduct_skill": true,
+  "default_mode": "guards",
+  "suborchestrator_types": [
+    "suborchestrator",
+    "ladder:suborchestrator"
+  ],
+  "suborchestrator_default_mode": "enforce",
+  "allow_tools": [
+    "Agent",
+    "SendMessage",
+    "TaskStop",
+    "TaskList",
+    "TaskGet",
+    "TaskCreate",
+    "TaskUpdate",
+    "TaskOutput",
+    "ReadNotifications",
+    "ListAgents",
+    "ToolSearch",
+    "Skill",
+    "AskUserQuestion",
+    "advisor",
+    "CronCreate",
+    "CronList",
+    "CronDelete",
+    "ScheduleWakeup",
+    "Monitor",
+    "PushNotification",
+    "SendUserFile",
+    "Artifact",
+    "ArtifactComments",
+    "ArtifactData",
+    "SendFeedback",
+    "EnterWorktree",
+    "ExitWorktree",
+    "EnterPlanMode",
+    "ExitPlanMode",
+    "EndConversation",
+    "TodoWrite",
+    "FetchInboxMessage",
+    "ReportFindings",
+    "SubagentHandback",
+    "ListMcpResourcesTool",
+    "Workflow"
+  ],
+  "conductor_prefixes": [],
+  "suborch_prefixes": [],
+  "conductor_deny_prefixes": [
+    "mcp__claude-in-chrome__",
+    "mcp__chrome-devtools__"
+  ],
+  "suborch_deny_prefixes": [
+    "mcp__claude-in-chrome__",
+    "mcp__chrome-devtools__"
+  ],
+  "deny_tools": [
+    "Grep",
+    "Glob"
+  ],
+  "file_tools": [
+    "Read",
+    "Edit",
+    "Write",
+    "NotebookEdit",
+    "MultiEdit"
+  ],
+  "writable_dirs": [
+    "~/.claude/plans",
+    "{cwd}/.orchestrate"
+  ],
+  "deny_write_dirs": [
+    "~/.claude/conductor-gate",
+    "/Library/Application Support/ClaudeCode",
+    "/etc/claude-code"
+  ],
+  "deny_write_parts": [
+    "bin"
+  ],
+  "deny_write_suffixes": [
+    ".sh",
+    ".py",
+    ".mjs",
+    ".js",
+    ".ts",
+    ".plist",
+    ".command",
+    ".zsh",
+    ".bash"
+  ],
+  "memory_dir_template": "~/.claude/projects/{slug}/memory",
+  "read_dirs": [
+    "~/.claude/plans",
+    "~/.claude/projects/*/memory",
+    "{cwd}/.orchestrate"
+  ],
+  "note_suffixes": [
+    ".md",
+    ".markdown",
+    ".txt",
+    ".ready",
+    ".done",
+    ".csv",
+    ".tsv"
+  ],
+  "deny_write_names": [
+    "conductor-gate*"
+  ],
+  "tamper_names": [
+    "conductor-gate*"
+  ],
+  "tamper_text": [
+    "conductor-gate",
+    "support/claudecode",
+    "etc/claude-code"
+  ],
+  "quiet_log_cwds": [],
+  "conductor_bash": [
+    "date(?: {SAFE_ARG})?",
+    "(?!.*\\.\\./)\"?(?:{PLUGIN_ROOT}|{CLAUDE_DIR}/plugins/[A-Za-z0-9._/-]+)/skills/orchestrate/scripts/ask_opus\\.sh\"? < \\.orchestrate/[A-Za-z0-9._-]+\\.md",
+    "(?!.*\\.\\./)python3 -I \"?(?:{PLUGIN_ROOT}|{CLAUDE_DIR}/plugins/[A-Za-z0-9._/-]+)/skills/conduct/scripts/gate_status\\.py\"? [A-Za-z0-9_-]{1,64}"
+  ],
+  "suborch_bash": [
+    "date(?: {SAFE_ARG})?"
+  ],
+  "projects": {}
+}
