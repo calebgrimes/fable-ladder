@@ -1,6 +1,6 @@
 {
   "name": "ladder",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Orchestrator plugin: /orchestrate conducts a multi-step build (Opus plans, Sonnet builds, Haiku does bulk work), an always-on delegation policy sets the tier on every Agent call, a self-updater keeps it current, and the conductor gate (/conduct, /direct, money guards, optional root lock) keeps the main window conducting. It never switches the session model.",
   "author": {
     "name": "Caleb Grimes"

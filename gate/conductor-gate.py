@@ -1597,6 +1597,61 @@ def build_rules(cfg, cwd):
     return rules
 
 
+def memory_note_path(raw, cwd, rules):
+    """The realpath of a Claude memory note, or None (0.5.1 memory notes).
+
+    A memory note is <config folder>/projects/<one folder>/memory/<name>.md, for
+    example MEMORY.md. The conductor and the sub-orchestrator may Write and Edit
+    it in every mode. The path must:
+    - name the config folder (~/.claude, $CLAUDE_CONFIG_DIR, or its realpath),
+    - have no ".." part, no symlink below the config folder, and no subfolder
+      under memory/,
+    - end in .md, and not be in a gate folder or a tamper folder,
+    - match the shape case-sensitively, and not be a hard link (st_nlink > 1).
+    Any other path gets the normal rules.
+    """
+    if not isinstance(raw, str) or not raw or "\x00" in raw:
+        return None
+    p = expand(raw)
+    if not os.path.isabs(p):
+        if not cwd:
+            return None
+        p = os.path.join(cwd, p)
+    if ".." in p.split("/"):
+        return None
+    p = os.path.normpath(p)
+    base = os.path.realpath(CLAUDE_DIR)
+    rest = None
+    for b in (CLAUDE_DIR, base):
+        b = os.path.normpath(b)
+        if p.startswith(b + "/"):
+            rest = p[len(b) + 1:]
+            break
+    if rest is None:
+        return None
+    parts = rest.split("/")
+    if (len(parts) != 4 or parts[0] != "projects" or parts[2] != "memory"
+            or parts[1] in ("", ".") or len(parts[3]) <= 3 or not parts[3].endswith(".md")):
+        return None
+    full = os.path.join(base, *parts)
+    if os.path.realpath(full) != full:
+        # A symlink below the config folder.
+        return None
+    try:
+        if os.lstat(full).st_nlink > 1:
+            # A hard link can point at a gate file.
+            return None
+    except FileNotFoundError:
+        pass
+    except OSError:
+        return None
+    if any(d and under(full, d) for d in rules["deny_write_dirs"]):
+        return None
+    if any(fnmatch.fnmatchcase(x.casefold(), n) for x in parts[:3] for n in rules["tamper_names"]):
+        return None
+    return full
+
+
 def off_switch():
     """The off switch line for the deny message (plugin mode or locked mode)."""
     if STATE.get("locked"):
@@ -1617,25 +1672,33 @@ def message(level, label):
             "(haiku for bulk, sonnet for builds, opus for judging). "
             "Read the block message: the allowed list depends on the project. "
             "Also allowed: wait loops (sleep, until [ -f x ]; do sleep N; done) and one plain "
-            "ls, cat or grep in a ledger folder or a memory folder (no chains). %s"
+            "ls, cat or grep in a ledger folder or a memory folder (no chains), and Write or Edit "
+            "of Claude's memory notes (~/.claude/projects/<project>/memory/<name>.md). %s"
             % (where, off_switch())
         )
     cfg = STATE.get("cfg") or {}
     opener = ", and open for a file or a web link" if cfg.get("allow_open_command", True) is True else ""
-    direct = ("To let the main window act this turn, the user starts the message with /direct. "
-              if cfg.get("allow_direct_skill", True) is True else "")
-    conduct = ("To let this window work hands-on until further notice, the user types /conduct off. "
-               if cfg.get("allow_conduct_skill", True) is True else "")
+    # Ask once, then delegate (0.5.1): one line to the user, then dispatch at once.
+    # No wait for the answer, no timeout, and no auto-allow.
+    agent = ("dispatch a worker now with the Agent tool (for a goal with several steps: "
+             "subagent_type %s) and set model." % SUBORCH_TYPE)
+    if cfg.get("allow_direct_skill", True) is True:
+        todo = ("If the job is small, ask the user in one line: 'Reply /direct and I'll do it myself.' "
+                "Then %s Do not wait for the answer. "
+                "If the user replies /direct after a worker started, check or stop that worker first, "
+                "so the job is not done twice. " % agent)
+    else:
+        todo = agent[0].upper() + agent[1:] + " "
+    todo += "Never use a worker to change the gate, its config, or its OFF file. "
     return (
-        "Conductor gate: the conductor does not do hands-on work%s. "
-        "Dispatch this goal to the sub-orchestrator with the Agent tool "
-        "(subagent_type %s) and set model. "
+        "Conductor gate: this tool is closed to the main window in conductor mode%s. %s"
         "Allowed for you: Agent, SendMessage, TaskStop, the ledger notes (.md, .txt, .ready) in "
-        "~/.claude/plans, the .orchestrate folder of this project and the project memory folder, "
+        "~/.claude/plans and the .orchestrate folder of this project, Claude's memory notes "
+        "(~/.claude/projects/<project>/memory/<name>.md), "
         "Read and one plain ls, cat or grep there, "
         "wait loops (sleep, until), the date command%s. "
-        "%s%s%s"
-        % (where, SUBORCH_TYPE, opener, direct, conduct, off_switch())
+        "%s"
+        % (where, todo, opener, off_switch())
     )
 
 
@@ -2214,6 +2277,12 @@ def main():
         if not isinstance(raw, str) or not raw:
             log("FAIL-OPEN", "no path for " + tool)
             sys.exit(0)
+        if tool in NOTE_EDIT_TOOLS:
+            mp = memory_note_path(raw, c, rules)
+            if mp:
+                # 0.5.1: a Claude memory note passes in every mode.
+                log("ALLOW-MEMORY", "%s %s" % (tool, mp[:180]))
+                sys.exit(0)
         p = norm(raw, c)
         memory_note = tool in NOTE_EDIT_TOOLS and own_memory_note(p)
         if tool != "Read" and tamper_path(p, note_ok=tool in NOTE_EDIT_TOOLS):

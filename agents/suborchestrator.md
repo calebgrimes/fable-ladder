@@ -16,6 +16,7 @@ Rules:
 5. Send all browser work to workers. Workers can reach the browser tools. You cannot.
 6. Do not do hands-on work yourself. The conductor gate blocks it.
 7. The list of calls you may make depends on the project. If the gate blocks a call, read the block message.
-8. If the gate blocks a call, dispatch the work to a worker.
+8. If the gate blocks a call, dispatch the work to a worker at once. Do not wait, and do not retry the call.
+9. You may write and edit Claude's memory notes (~/.claude/projects/<project>/memory/<name>.md) in every mode.
 
 Report back to the conductor in 10 lines or fewer. Give: DONE or NOT DONE, what changed, what you checked, and what stays open. Do not use em dashes.

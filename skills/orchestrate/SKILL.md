@@ -202,6 +202,15 @@ the helper with that file as input. The gate allows this exact form:
 "<that path>/scripts/ask_opus.sh" < .orchestrate/packet.md
 ```
 
+If the gate blocks a hands-on call in this window, do not retry it. If the job
+is small, ask the user in one line: "Reply /direct and I'll do it myself." Then
+dispatch a worker at once with the Agent tool. Do not wait for the answer.
+If the user replies /direct after a worker started, check or stop that worker
+first, so the job is not done twice. Never use a worker to change the gate, its
+config, or its OFF file.
+You may write and edit Claude's memory notes
+(`~/.claude/projects/<project>/memory/<name>.md`) in every mode.
+
 The helper calls Claude Code headless with no tools and no saved session, so
 the plan costs the conducting window only its answer. Overrides: `ORCH_MODEL`
 (default `claude-opus-5-5`, falls back to the `opus` alias), `ORCH_EFFORT`

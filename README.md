@@ -5,7 +5,7 @@ dispatches. Opus plans in a clean side call, Sonnet builds, Haiku does the bulk 
 worker at a time, with the board and handover kept in files so the conducting window stays small
 enough to run for days. The plugin never switches your session's model; you choose that.
 
-Version 0.5.0 adds the **conductor gate**: a PreToolUse hook that checks each tool call of the main
+Version 0.5.0 added the **conductor gate**: a PreToolUse hook that checks each tool call of the main
 window. In a project you mark for it, the main window must dispatch work to sub-agents instead of doing
 it hands-on. In every window it keeps two money guards on.
 
@@ -107,7 +107,7 @@ Planner overrides: `ORCH_MODEL` (default `claude-opus-5-5`, falls back to `opus`
 | Mode | Marker | What the main window can do |
 |---|---|---|
 | guards (the default) | `◇ DIRECT` | Hands-on work. Only the money guards and the gate's own files are checked. |
-| enforce | `◆ CONDUCTOR` | Coordination only: dispatch with the Agent tool, read and write notes in `~/.claude/plans`, the project memory folder and `{cwd}/.orchestrate`, run `date`, and a short list of safe commands. Hands-on calls are blocked with a message that says how to dispatch them. |
+| enforce | `◆ CONDUCTOR` | Coordination only: dispatch with the Agent tool, read and write notes in `~/.claude/plans`, the project memory folder and `{cwd}/.orchestrate`, write Claude's memory notes, run `date`, and a short list of safe commands. Hands-on calls are blocked with a message that tells Claude to ask once, then delegate (see below). |
 | warn | `○ GATE warn` | Like enforce, but the gate only warns. |
 | log | `○ GATE log` | Headless runs (`claude -p`). The gate only logs what it would block. An explicit Fable model is still blocked. |
 | off | `○ GATE off` | The gate allows every call in that folder. |
@@ -122,6 +122,27 @@ How the gate picks the mode of a window, first match wins:
 
 A sub-orchestrator (`ladder:suborchestrator`) is always enforce, whatever the window mode. `/conduct`
 and guards do not change it. Workers (any other sub-agent) are not checked.
+
+### Ask once, then delegate
+
+When the gate blocks a hands-on call in conductor mode (enforce, or after `/conduct on`), the message
+tells Claude what to do:
+
+1. If the job is small, ask you in one line: "Reply /direct and I'll do it myself."
+2. Dispatch a worker at once with the Agent tool. Do not wait for your answer.
+
+If you reply `/direct`, the main window does the next task itself. If a worker already started on
+that job, Claude checks or stops the worker first, so the job is not done twice. There is no timeout,
+and the gate never allows the call by itself. The message also says: never use a worker to change the
+gate, its config, or its OFF file.
+
+### Memory notes
+
+The conductor and the sub-orchestrator may write and edit Claude's memory notes in every mode, for any
+project: `~/.claude/projects/<project>/memory/<name>.md`, including `MEMORY.md`. The gate logs these
+calls as `ALLOW-MEMORY`. The rule does not apply to a path with a symlink or a `..` part, a subfolder
+under `memory/`, a file that is not `.md`, a path in a gate folder, or a Bash command. These get the
+normal rules.
 
 ### /conduct and /direct
 
@@ -198,7 +219,7 @@ terminal before it changes anything.
 1. Make a fresh clone of the release tag in your home folder:
 
    ```bash
-   git clone --depth 1 --branch v0.5.0 https://github.com/calebgrimes/fable-ladder ~/fable-ladder-lock
+   git clone --depth 1 --branch v0.5.1 https://github.com/calebgrimes/fable-ladder ~/fable-ladder-lock
    ```
 
    Do not use the plugin cache in `~/.claude/plugins`. A Claude session can edit the cache, and the
@@ -275,6 +296,8 @@ Do these steps in order:
 
 ## Known limits
 
+- A window can write memory notes that later sessions of every project load. The gate does not judge
+  memory note content. Check the ALLOW-MEMORY rows in the log.
 - The gate reads the session transcript, which is a file that you own. A worker can append a forged
   `/conduct` or `/direct` line to it. The gate checks every field of the line, but it cannot prove who
   wrote the file. A forged `/direct` line opens one turn. A forged `/conduct off` line opens
